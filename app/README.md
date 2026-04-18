@@ -49,6 +49,18 @@ npm run preview
 
 Desktop-only — designed against a 1440 px viewport, matching the provided HTML reference.
 
+## GitHub Pages deployment
+
+A workflow at `.github/workflows/deploy-pages.yml` builds and deploys `app/` to GitHub Pages every time the branch is pushed. The Vite `base` is set at build time from the repo name (`VITE_BASE=/<repo>/`), so asset URLs resolve under the project Pages subpath.
+
+To enable:
+
+1. In the GitHub repository, open **Settings → Pages**.
+2. Under **Build and deployment → Source**, select **GitHub Actions**.
+3. Push to `main` (or the current feature branch) and the workflow will publish the app to `https://<user>.github.io/<repo>/`.
+
+A `404.html` copy of `index.html` and a `.nojekyll` marker are added automatically so SPA deep links and assets work.
+
 ## Layout
 
 ```
