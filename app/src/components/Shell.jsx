@@ -11,6 +11,7 @@ export function Sidebar() {
     { id: "gantt",     label: "Gantt View",    icon: "gantt"    },
     { id: "analytics", label: "Analytics",     icon: "analytics" },
     { id: "sim",       label: "Simulation",    icon: "sim"      },
+    { id: "tools",     label: "Industrial Tools", icon: "cpu"   },
     { id: "reports",   label: "Reports",       icon: "report"   },
     { id: "settings",  label: "Settings",      icon: "settings" },
   ];
@@ -24,14 +25,14 @@ export function Sidebar() {
       </div>
       <aside className="sidebar">
         <div className="nav-group-label">Workspace</div>
-        {items.slice(0, 6).map(it => (
+        {items.slice(0, 7).map(it => (
           <div key={it.id} className={`nav-item ${page === it.id ? "active" : ""}`} onClick={() => setPage(it.id)}>
             <span className="nav-icon"><Icon name={it.icon} size={15}/></span>
             <span>{it.label}</span>
           </div>
         ))}
         <div className="nav-group-label">System</div>
-        {items.slice(6).map(it => (
+        {items.slice(7).map(it => (
           <div key={it.id} className={`nav-item ${page === it.id ? "active" : ""}`} onClick={() => setPage(it.id)}>
             <span className="nav-icon"><Icon name={it.icon} size={15}/></span>
             <span>{it.label}</span>
@@ -54,6 +55,13 @@ export function TopBar({ schedule }) {
   const taktTime = useStore(s => s.taktTime);
   const setTakt = useStore(s => s.setTakt);
   const settings = useStore(s => s.settings);
+  const togglePalette = useStore(s => s.togglePalette);
+  const toggleShortcuts = useStore(s => s.toggleShortcuts);
+  const undo = useStore(s => s.undo);
+  const redo = useStore(s => s.redo);
+  const canUndo = useStore(s => s._past.length > 0);
+  const canRedo = useStore(s => s._future.length > 0);
+  const saveNewVersion = useStore(s => s.saveNewVersion);
   const [search, setSearch] = React.useState("");
   const setPage = useStore(s => s.setPage);
   const steps = useStore(s => s.steps);
@@ -81,7 +89,7 @@ export function TopBar({ schedule }) {
           <div>
             <div className="lbl">Takt</div>
             <div style={{ display: "flex", alignItems: "center" }}>
-              <input type="number" value={taktTime} onChange={e => setTakt(Number(e.target.value) || 0)} min={10} max={9999}/>
+              <input type="number" value={taktTime} onChange={e => setTakt(Number(e.target.value) || 0)} min={5} max={9999}/>
               <span style={{ color: "var(--ink-4)", fontWeight: 500, fontSize: 11 }}>s</span>
             </div>
           </div>
@@ -109,22 +117,23 @@ export function TopBar({ schedule }) {
         </div>
       </div>
       <div className="topbar-right" style={{ position: "relative" }}>
-        <div className="search">
+        <div className="search" onClick={() => togglePalette(true)} style={{ cursor: "pointer" }} title="Open command palette (Cmd/Ctrl+K)">
           <Icon name="search" size={14} style={{ color: "var(--ink-4)" }}/>
           <input
-            placeholder="Search steps, machines, OPC tags..."
+            placeholder="Search steps · commands…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onFocus={(e) => e.target.select()}
           />
           <span className="kbd">⌘ K</span>
         </div>
         {searchResults.length > 0 && (
-          <div className="card" style={{ position: "absolute", top: 38, right: 90, width: 280, zIndex: 30 }}>
+          <div className="card" style={{ position: "absolute", top: 44, right: 160, width: 280, zIndex: 30 }}>
             {searchResults.map(s => (
               <div
                 key={s.id}
                 style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)", cursor: "pointer", fontSize: 12 }}
-                onClick={() => { setPage("builder"); setSelectedId(s.id); setSearch(""); }}
+                onMouseDown={() => { setPage("builder"); setSelectedId(s.id); setSearch(""); }}
               >
                 <div style={{ fontWeight: 600 }}>{s.name}</div>
                 <div className="mono muted" style={{ fontSize: 10 }}>{s.id}</div>
@@ -132,7 +141,10 @@ export function TopBar({ schedule }) {
             ))}
           </div>
         )}
-        <button className="icon-btn" title="Notifications"><Icon name="bell" size={14}/></button>
+        <button className="icon-btn" title="Undo (Cmd+Z)" onClick={undo} disabled={!canUndo}><Icon name="reset" size={14}/></button>
+        <button className="icon-btn" title="Redo (Cmd+Shift+Z)" onClick={redo} disabled={!canRedo}><Icon name="history" size={14}/></button>
+        <button className="icon-btn" title="Save version (Cmd+S)" onClick={() => saveNewVersion()}><Icon name="save" size={14}/></button>
+        <button className="icon-btn" title="Shortcuts (?)" onClick={() => toggleShortcuts(true)}><Icon name="bell" size={14}/></button>
       </div>
     </div>
   );
@@ -152,7 +164,7 @@ export function StatusBar({ schedule }) {
   return (
     <div className="statusbar">
       <span className="dot-live"/>
-      <span>CONNECTED · OPC-UA @ 192.168.14.22</span>
+      <span>AUTO-SAVE · LOCAL</span>
       <span className="sep"/>
       <span>{steps.length} STEPS · TAKT {taktTime}s · CT {schedule.totalCycleTime}s</span>
       <span className="sep"/>
@@ -161,7 +173,7 @@ export function StatusBar({ schedule }) {
       </span>
       <span className="sep"/>
       <span>{settings.line} / {settings.shift} / {time.toLocaleTimeString()}</span>
-      <span style={{ marginLeft: "auto" }}>v{versionCount || 14} · AUTO-SAVED</span>
+      <span style={{ marginLeft: "auto" }}>v{versionCount || 14}</span>
     </div>
   );
 }

@@ -13,6 +13,9 @@ export default function Builder({ schedule }) {
   const addStep = useStore(s => s.addStep);
   const updateStep = useStore(s => s.updateStep);
   const removeStep = useStore(s => s.removeStep);
+  const removeSteps = useStore(s => s.removeSteps);
+  const bulkAssignStation = useStore(s => s.bulkAssignStation);
+  const bulkNudgeTime = useStore(s => s.bulkNudgeTime);
   const duplicateStep = useStore(s => s.duplicateStep);
   const reorderSteps = useStore(s => s.reorderSteps);
   const addToGroup = useStore(s => s.addToGroup);
@@ -20,13 +23,17 @@ export default function Builder({ schedule }) {
   const setDependencies = useStore(s => s.setDependencies);
   const replaceSteps = useStore(s => s.replaceSteps);
   const saveNewVersion = useStore(s => s.saveNewVersion);
+  const exportProjectJSON = useStore(s => s.exportProjectJSON);
+  const importProjectJSON = useStore(s => s.importProjectJSON);
   const taktTime = useStore(s => s.taktTime);
   const toast = useStore(s => s.toast);
+  const setPage = useStore(s => s.setPage);
 
   const [dragId, setDragId] = useState(null);
   const [overId, setOverId] = useState(null);
   const [multiSelect, setMultiSelect] = useState(new Set());
   const fileRef = useRef(null);
+  const jsonRef = useRef(null);
 
   const sel = schedule.steps.find(s => s.id === selectedId) || schedule.steps[0];
   const stepById = {};
@@ -42,11 +49,8 @@ export default function Builder({ schedule }) {
   };
   const onDragEnter = (id) => setOverId(id);
   const onDragEnd = () => {
-    if (dragId && overId && dragId !== overId) {
-      reorderSteps(dragId, overId);
-    }
-    setDragId(null);
-    setOverId(null);
+    if (dragId && overId && dragId !== overId) reorderSteps(dragId, overId);
+    setDragId(null); setOverId(null);
   };
 
   const toggleMulti = (id, e) => {
@@ -54,9 +58,10 @@ export default function Builder({ schedule }) {
       const next = new Set(multiSelect);
       if (next.has(id)) next.delete(id); else next.add(id);
       setMultiSelect(next);
+      setSelectedId(id);
     } else {
       setSelectedId(id);
-      setMultiSelect(new Set([id]));
+      setMultiSelect(new Set());
     }
   };
 
@@ -75,7 +80,7 @@ export default function Builder({ schedule }) {
     setMultiSelect(new Set());
   };
 
-  const onImport = async (e) => {
+  const onImportXLSX = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
     try {
@@ -89,6 +94,13 @@ export default function Builder({ schedule }) {
     e.target.value = "";
   };
 
+  const onImportJSON = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    await importProjectJSON(f);
+    e.target.value = "";
+  };
+
   const onExport = () => exportStepsToExcel(steps, schedule);
 
   const onAddSuggested = (kind) => {
@@ -97,9 +109,12 @@ export default function Builder({ schedule }) {
       transfer: { name: "Transfer", machineTime: 0, operatorTime: 2, setupTime: 0, transferTime: 4, dependencies: sel ? [sel.id] : [] },
       cooling: { name: "Cooling", machineTime: 10, operatorTime: 0, setupTime: 0, dependencies: sel ? [sel.id] : [] },
       quality: { name: "Quality Check", machineTime: 2, operatorTime: 8, setupTime: 1, dependencies: sel ? [sel.id] : [] },
+      automation: { name: "Automation", machineTime: 18, operatorTime: 2, setupTime: 2, dependencies: sel ? [sel.id] : [] },
     };
     addStep(defs[kind] || defs.inspection);
   };
+
+  const selectedArr = Array.from(multiSelect);
 
   return (
     <>
@@ -107,16 +122,19 @@ export default function Builder({ schedule }) {
       <div className="page-head">
         <div>
           <h1 className="page-title">Cycle Builder</h1>
-          <div className="page-sub">Drag steps to reorder. Shift+Click to multi-select, then parallelize. Totals update live.</div>
+          <div className="page-sub">Drag to reorder. Shift+Click to multi-select then Parallelize / batch-edit. <span className="mono muted">N</span> adds a step.</div>
         </div>
         <div className="toolbar">
-          <button className="btn" onClick={() => addStep()}><Icon name="plus" size={13}/> Add step</button>
+          <button className="btn" onClick={() => addStep()} title="N"><Icon name="plus" size={13}/> Add</button>
           <button className="btn" onClick={onParallelize}><Icon name="layers" size={13}/> Parallelize ({multiSelect.size})</button>
           <button className="btn" onClick={onUngroup}><Icon name="minus" size={13}/> Ungroup</button>
-          <input type="file" ref={fileRef} style={{ display: "none" }} accept=".xlsx,.xls,.csv" onChange={onImport}/>
-          <button className="btn" onClick={() => fileRef.current?.click()}><Icon name="upload" size={13}/> Import</button>
+          <input type="file" ref={fileRef} style={{ display: "none" }} accept=".xlsx,.xls,.csv" onChange={onImportXLSX}/>
+          <input type="file" ref={jsonRef} style={{ display: "none" }} accept=".json" onChange={onImportJSON}/>
+          <button className="btn" onClick={() => fileRef.current?.click()} title="Import Excel / CSV"><Icon name="upload" size={13}/> Excel</button>
+          <button className="btn" onClick={() => jsonRef.current?.click()} title="Import project JSON"><Icon name="upload" size={13}/> JSON</button>
           <button className="btn" onClick={downloadTemplate} title="Download Excel template"><Icon name="download" size={13}/> Template</button>
-          <button className="btn" onClick={onExport}><Icon name="export" size={13}/> Export</button>
+          <button className="btn" onClick={onExport}><Icon name="export" size={13}/> Export .xlsx</button>
+          <button className="btn" onClick={exportProjectJSON}><Icon name="export" size={13}/> Export .json</button>
           <button className="btn accent" onClick={() => saveNewVersion()}><Icon name="save" size={13}/> Save version</button>
         </div>
       </div>
@@ -131,6 +149,31 @@ export default function Builder({ schedule }) {
             </div>
           </div>
           <span className="tag red">{warnings.length}</span>
+        </div>
+      )}
+
+      {multiSelect.size > 0 && (
+        <div className="bulk-bar">
+          <span className="mono" style={{ fontWeight: 600 }}>{multiSelect.size} selected</span>
+          <div style={{ flex: 1 }}/>
+          <input
+            className="input"
+            placeholder="Assign station…"
+            style={{ width: 140, height: 28 }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && e.target.value.trim()) {
+                bulkAssignStation(selectedArr, e.target.value.trim());
+                e.target.value = "";
+                setMultiSelect(new Set());
+              }
+            }}
+          />
+          <button className="btn xs" onClick={() => bulkNudgeTime(selectedArr, "machineTime", -5)}><Icon name="arrow-down" size={11}/> Machine −5s</button>
+          <button className="btn xs" onClick={() => bulkNudgeTime(selectedArr, "machineTime", +5)}><Icon name="arrow-up" size={11}/> Machine +5s</button>
+          <button className="btn xs" onClick={() => bulkNudgeTime(selectedArr, "operatorTime", -5)}><Icon name="arrow-down" size={11}/> Op −5s</button>
+          <button className="btn xs" onClick={() => bulkNudgeTime(selectedArr, "operatorTime", +5)}><Icon name="arrow-up" size={11}/> Op +5s</button>
+          <button className="btn xs danger" onClick={() => { if (confirm(`Remove ${multiSelect.size} step(s)?`)) { removeSteps(selectedArr); setMultiSelect(new Set()); } }}><Icon name="trash" size={11}/> Delete</button>
+          <button className="btn xs" onClick={() => setMultiSelect(new Set())}>Clear</button>
         </div>
       )}
 
@@ -156,7 +199,7 @@ export default function Builder({ schedule }) {
             {schedule.steps.map((s, i) => (
               <div
                 key={s.id}
-                className={`step-card ${selectedId === s.id ? "selected" : ""} ${s.bottleneck ? "bottleneck" : ""} ${s.groupId ? "group" : ""} ${dragId === s.id ? "dragging" : ""} ${multiSelect.has(s.id) ? "selected" : ""}`}
+                className={`step-card ${selectedId === s.id || multiSelect.has(s.id) ? "selected" : ""} ${s.bottleneck ? "bottleneck" : ""} ${s.groupId ? "group" : ""} ${dragId === s.id ? "dragging" : ""} ${overId === s.id ? "drop-target" : ""}`}
                 draggable
                 onDragStart={(e) => onDragStart(s.id, e)}
                 onDragEnter={() => onDragEnter(s.id)}
@@ -178,58 +221,25 @@ export default function Builder({ schedule }) {
                   </div>
                   <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                     {s.groupId && <span className="group-badge">‖ {s.groupId.slice(0, 6)}</span>}
+                    {s.wasteType && <span className="tag amber" title={`Waste tag: ${s.wasteType}`}>{s.wasteType.toUpperCase()}</span>}
                     {s.bottleneck && <span className="tag red">B/N</span>}
                     {!s.bottleneck && s.critical && <span className="tag blue">CRIT</span>}
-                    <button
-                      className="icon-btn"
-                      style={{ width: 22, height: 22 }}
-                      title="Duplicate"
-                      onClick={(e) => { e.stopPropagation(); duplicateStep(s.id); }}
-                    ><Icon name="copy" size={11}/></button>
-                    <button
-                      className="icon-btn"
-                      style={{ width: 22, height: 22 }}
-                      title="Remove"
-                      onClick={(e) => { e.stopPropagation(); removeStep(s.id); }}
-                    ><Icon name="trash" size={11}/></button>
+                    <button className="icon-btn" style={{ width: 22, height: 22 }} title="Duplicate" onClick={(e) => { e.stopPropagation(); duplicateStep(s.id); }}><Icon name="copy" size={11}/></button>
+                    <button className="icon-btn" style={{ width: 22, height: 22 }} title="Remove" onClick={(e) => { e.stopPropagation(); removeStep(s.id); }}><Icon name="trash" size={11}/></button>
                   </div>
                 </div>
                 <div className="step-meta">
                   <div className="m machine">
                     <div className="k">MACH</div>
-                    <input
-                      className="input num"
-                      style={{ border: 0, background: "transparent", padding: 0, color: "var(--blue)", fontWeight: 600, fontSize: 12, minHeight: "auto", width: "100%" }}
-                      type="number"
-                      value={s.machineTime}
-                      min={0}
-                      onChange={(e) => updateStep(s.id, { machineTime: Math.max(0, Number(e.target.value) || 0) })}
-                      onClick={(e) => e.stopPropagation()}
-                    />
+                    <input className="input num" style={inlineNumStyle("var(--blue)")} type="number" value={s.machineTime} min={0} onChange={(e) => updateStep(s.id, { machineTime: Math.max(0, Number(e.target.value) || 0) })} onClick={(e) => e.stopPropagation()}/>
                   </div>
                   <div className="m op">
                     <div className="k">OP</div>
-                    <input
-                      className="input num"
-                      style={{ border: 0, background: "transparent", padding: 0, color: "#0A8CA3", fontWeight: 600, fontSize: 12, minHeight: "auto", width: "100%" }}
-                      type="number"
-                      value={s.operatorTime}
-                      min={0}
-                      onChange={(e) => updateStep(s.id, { operatorTime: Math.max(0, Number(e.target.value) || 0) })}
-                      onClick={(e) => e.stopPropagation()}
-                    />
+                    <input className="input num" style={inlineNumStyle("#0A8CA3")} type="number" value={s.operatorTime} min={0} onChange={(e) => updateStep(s.id, { operatorTime: Math.max(0, Number(e.target.value) || 0) })} onClick={(e) => e.stopPropagation()}/>
                   </div>
                   <div className="m setup">
                     <div className="k">SET</div>
-                    <input
-                      className="input num"
-                      style={{ border: 0, background: "transparent", padding: 0, color: "var(--violet)", fontWeight: 600, fontSize: 12, minHeight: "auto", width: "100%" }}
-                      type="number"
-                      value={s.setupTime}
-                      min={0}
-                      onChange={(e) => updateStep(s.id, { setupTime: Math.max(0, Number(e.target.value) || 0) })}
-                      onClick={(e) => e.stopPropagation()}
-                    />
+                    <input className="input num" style={inlineNumStyle("var(--violet)")} type="number" value={s.setupTime} min={0} onChange={(e) => updateStep(s.id, { setupTime: Math.max(0, Number(e.target.value) || 0) })} onClick={(e) => e.stopPropagation()}/>
                   </div>
                 </div>
                 <div className="step-deps">
@@ -238,9 +248,13 @@ export default function Builder({ schedule }) {
                     ? <span style={{ color: "var(--ink-4)" }}>—</span>
                     : s.dependencies.map(d => <span key={d} className="tag" style={{ fontSize: 9 }}>{(stepById[d]?.name || d).slice(0, 12)}</span>)
                   }
+                  {s.stationId && <span className="tag cyan" style={{ fontSize: 9, marginLeft: "auto" }}>{s.stationId}</span>}
                 </div>
               </div>
             ))}
+            <button className="btn sm" style={{ margin: "4px 2px 0" }} onClick={() => addStep()}>
+              <Icon name="plus" size={12}/> Add step
+            </button>
           </div>
         </div>
 
@@ -256,17 +270,10 @@ export default function Builder({ schedule }) {
             </div>
           </div>
           <div className="card-body tight">
-            <Gantt
-              steps={schedule.steps}
-              totalCT={schedule.totalCycleTime}
-              takt={taktTime}
-              tickEvery={30}
-              showDeps
-              onStepClick={(s) => setSelectedId(s.id)}
-            />
+            <Gantt steps={schedule.steps} totalCT={schedule.totalCycleTime} takt={taktTime} tickEvery={30} showDeps onStepClick={(s) => setSelectedId(s.id)}/>
           </div>
           <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10, fontSize: 11.5, color: "var(--ink-3)" }}>
-            <Icon name="clock" size={13}/> Updated just now — topological re-scheduling on change.
+            <Icon name="clock" size={13}/> Real-time — re-scheduled on every change.
           </div>
         </div>
 
@@ -277,12 +284,7 @@ export default function Builder({ schedule }) {
               <div className="card">
                 <div className="card-head"><h3>Step Inspector</h3><span className="sub">{String(schedule.steps.findIndex(s => s.id === sel.id) + 1).padStart(2, "0")}</span></div>
                 <div className="card-body" style={{ display: "grid", gap: 10 }}>
-                  <input
-                    className="input"
-                    style={{ fontWeight: 600, fontSize: 13 }}
-                    value={sel.name}
-                    onChange={(e) => updateStep(sel.id, { name: e.target.value })}
-                  />
+                  <input className="input" style={{ fontWeight: 600, fontSize: 13 }} value={sel.name} onChange={(e) => updateStep(sel.id, { name: e.target.value })}/>
                   {[
                     { k: "machineTime", label: "Machine time", max: 200, color: "var(--blue)" },
                     { k: "operatorTime", label: "Operator time", max: 120, color: "var(--cyan)" },
@@ -303,12 +305,34 @@ export default function Builder({ schedule }) {
                       <input className="input num" style={{ width: "100%" }} type="number" value={sel.variability || 0} onChange={(e) => updateStep(sel.id, { variability: Number(e.target.value) || 0 })}/>
                     </label>
                   </div>
+
                   <label style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                     <input type="checkbox" checked={sel.isValueAdded !== false} onChange={(e) => updateStep(sel.id, { isValueAdded: e.target.checked })}/>
                     <span>Value-added</span>
                   </label>
 
-                  <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 4 }}>Dependencies</div>
+                  <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 4 }}>Waste classification (Lean)</div>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {["", "muda", "mura", "muri"].map(w => (
+                      <button
+                        key={w || "none"}
+                        className={`btn xs ${sel.wasteType === (w || null) ? "accent" : ""}`}
+                        onClick={() => updateStep(sel.id, { wasteType: w || null })}
+                        style={{ flex: 1 }}
+                      >{w ? w.toUpperCase() : "CLEAR"}</button>
+                    ))}
+                  </div>
+
+                  <div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>Notes</div>
+                  <textarea
+                    className="input"
+                    style={{ minHeight: 60, resize: "vertical", fontFamily: "inherit" }}
+                    value={sel.notes || ""}
+                    onChange={(e) => updateStep(sel.id, { notes: e.target.value })}
+                    placeholder="Engineering notes, constraints, or observations…"
+                  />
+
+                  <div style={{ fontSize: 11.5, color: "var(--ink-3)" }}>Dependencies</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                     {schedule.steps.filter(s2 => s2.id !== sel.id).map(s2 => {
                       const selected = (sel.dependencies || []).includes(s2.id);
@@ -335,7 +359,7 @@ export default function Builder({ schedule }) {
               <div className="card">
                 <div className="card-head"><h3>Smart Suggestions</h3><span className="sub">AI</span></div>
                 <div className="card-body" style={{ display: "grid", gap: 6 }}>
-                  {suggestNextSteps(sel).slice(0, 3).map((sg, i) => (
+                  {suggestNextSteps(sel).slice(0, 4).map((sg, i) => (
                     <div key={i} className="suggestion">
                       <div className="ic"><Icon name="zap" size={14}/></div>
                       <div style={{ fontSize: 12 }}>
@@ -351,7 +375,7 @@ export default function Builder({ schedule }) {
           )}
 
           <div className="card">
-            <div className="card-head"><h3>Wait & Slack</h3><span className="sub">vs critical path</span></div>
+            <div className="card-head"><h3>Wait &amp; Slack</h3><span className="sub">vs critical path</span></div>
             <div className="card-body">
               {schedule.steps.slice(0, 6).map(s => {
                 const slack = s.critical ? 0 : Math.max(0, schedule.totalCycleTime - s.endTime);
@@ -371,7 +395,8 @@ export default function Builder({ schedule }) {
               <div className="card-body" style={{ fontSize: 12, color: "var(--ink-2)" }}>
                 <b style={{ color: "var(--red)" }}>{schedule.bottleneck?.name}</b> is {((schedule.bottleneck.cycleTime / Math.max(1, schedule.totalCycleTime)) * 100).toFixed(0)}% of cycle and defines takt limit.
                 <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
-                  <button className="btn danger sm" onClick={() => { setSelectedId(schedule.bottleneck.id); }}>Jump to step</button>
+                  <button className="btn danger sm" onClick={() => setSelectedId(schedule.bottleneck.id)}>Jump to step</button>
+                  <button className="btn sm" onClick={() => setPage("sim")}>Simulate</button>
                 </div>
               </div>
             </div>
@@ -395,4 +420,10 @@ export default function Builder({ schedule }) {
       </div>
     </>
   );
+}
+
+function inlineNumStyle(color) {
+  return {
+    border: 0, background: "transparent", padding: 0, color, fontWeight: 600, fontSize: 12, minHeight: "auto", width: "100%",
+  };
 }
