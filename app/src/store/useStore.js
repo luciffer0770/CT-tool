@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { saveProject, loadProject, saveVersion, loadVersions, deleteVersion, saveSettings, loadSettings } from "../engine/storage.js";
+import { saveProject, loadProject, saveVersion, loadVersions, deleteVersion, saveSettings, loadSettings, onStorageError } from "../engine/storage.js";
 import { DEFAULT_STEPS, DEFAULT_TAKT, TEMPLATES } from "../data/templates.js";
 import { INITIAL_ACTIVITY } from "../data/activity.js";
 
@@ -19,6 +19,12 @@ const DEFAULT_SETTINGS = {
   availableTimeMin: 420,  // minutes per shift
   demandPerShift: 100,
   kanbanSafetyPct: 20,
+  // Profile
+  profileName: "M. Becker",
+  profileInitials: "MB",
+  profileRole: "Process Engineer · Plant 3",
+  profileEmail: "",
+  profileAvatarColor: "#6D28D9",
 };
 
 function genId(prefix = "s") {
@@ -347,8 +353,9 @@ export const useStore = create((set, get) => ({
     applyThemeDom(next);
   },
 
-  pushActivity: (text, tag = "edit", who = "M. Becker") => {
-    set(state => ({ activity: [{ when: "now", who, act: text, tag }, ...state.activity].slice(0, 40) }));
+  pushActivity: (text, tag = "edit", who) => {
+    const author = who || get().settings?.profileName || "User";
+    set(state => ({ activity: [{ when: "now", who: author, act: text, tag }, ...state.activity].slice(0, 40) }));
   },
 
   addLineSnapshot: (label) => {
@@ -456,4 +463,8 @@ if (typeof window !== "undefined") {
   // Initial sync: if URL hash was set, use it
   const hp = hashPage();
   if (hp) useStore.setState({ page: normalizePage(hp) });
+  // Surface any storage issues as toasts
+  onStorageError((msg) => {
+    useStore.getState().toast(msg, "error");
+  });
 }

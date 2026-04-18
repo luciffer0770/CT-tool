@@ -5,7 +5,7 @@ import Swimlane from "../components/Swimlane.jsx";
 import ProcessFlow from "../components/ProcessFlow.jsx";
 import { HBar } from "../components/Charts.jsx";
 import { useStore } from "../store/useStore.js";
-import { exportGanttSVG, exportGanttPNG } from "../engine/pdf.js";
+import { exportGanttSVG, exportGanttPNG } from "../engine/pdf-lazy.js";
 
 export default function GanttView({ schedule }) {
   const taktTime = useStore(s => s.taktTime);

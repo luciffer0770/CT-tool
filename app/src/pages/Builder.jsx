@@ -4,7 +4,7 @@ import Gantt from "../components/Gantt.jsx";
 import { HBar } from "../components/Charts.jsx";
 import { useStore } from "../store/useStore.js";
 import { suggestNextSteps, validateSteps, suggestOptimization } from "../engine/analytics.js";
-import { importStepsFromFile, exportStepsToExcel, downloadTemplate } from "../engine/excel.js";
+import { importStepsFromFile, exportStepsToExcel, downloadTemplate } from "../engine/excel-lazy.js";
 
 export default function Builder({ schedule }) {
   const steps = useStore(s => s.steps);

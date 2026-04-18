@@ -5,6 +5,8 @@ import { Sidebar, TopBar, StatusBar, Toasts } from "./components/Shell.jsx";
 import CommandPalette from "./components/CommandPalette.jsx";
 import ShortcutsModal from "./components/ShortcutsModal.jsx";
 import KeyboardShortcuts from "./components/KeyboardShortcuts.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
+import OnlineIndicator from "./components/OnlineIndicator.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Builder from "./pages/Builder.jsx";
 import GanttView from "./pages/GanttView.jsx";
@@ -22,27 +24,32 @@ export default function App() {
   const schedule = useMemo(() => computeSchedule(steps, taktTime), [steps, taktTime]);
 
   return (
-    <div className="app" data-screen-label={page}>
-      <Sidebar/>
-      <TopBar schedule={schedule}/>
-      <main className="main">
-        {page === "dashboard" && <Dashboard schedule={schedule}/>}
-        {page === "builder" && <Builder schedule={schedule}/>}
-        {page === "gantt" && <GanttView schedule={schedule}/>}
-        {page === "analytics" && <Analytics schedule={schedule}/>}
-        {page === "sim" && <Simulation schedule={schedule}/>}
-        {page === "tools" && <Tools schedule={schedule}/>}
-        {page === "reports" && <Reports schedule={schedule}/>}
-        {page === "settings" && <Settings/>}
-        <div style={{ height: 40 }}/>
-      </main>
-      <div style={{ gridColumn: "1 / -1" }}>
-        <StatusBar schedule={schedule}/>
+    <ErrorBoundary>
+      <div className="app" data-screen-label={page}>
+        <Sidebar/>
+        <TopBar schedule={schedule}/>
+        <main className="main">
+          <ErrorBoundary>
+            {page === "dashboard" && <Dashboard schedule={schedule}/>}
+            {page === "builder" && <Builder schedule={schedule}/>}
+            {page === "gantt" && <GanttView schedule={schedule}/>}
+            {page === "analytics" && <Analytics schedule={schedule}/>}
+            {page === "sim" && <Simulation schedule={schedule}/>}
+            {page === "tools" && <Tools schedule={schedule}/>}
+            {page === "reports" && <Reports schedule={schedule}/>}
+            {page === "settings" && <Settings/>}
+          </ErrorBoundary>
+          <div style={{ height: 40 }}/>
+        </main>
+        <div style={{ gridColumn: "1 / -1" }}>
+          <StatusBar schedule={schedule}/>
+        </div>
+        <Toasts/>
+        <CommandPalette/>
+        <ShortcutsModal/>
+        <KeyboardShortcuts/>
+        <OnlineIndicator/>
       </div>
-      <Toasts/>
-      <CommandPalette/>
-      <ShortcutsModal/>
-      <KeyboardShortcuts/>
-    </div>
+    </ErrorBoundary>
   );
 }

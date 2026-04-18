@@ -435,7 +435,7 @@ body {
   user-select: none;
 }
 .gantt-head {
-  display: grid; grid-template-columns: 140px 1fr;
+  display: grid; grid-template-columns: var(--label-w, 140px) 1fr;
   border-bottom: 1px solid var(--border);
   font-family: var(--font-mono); font-size: 10px; color: var(--ink-4);
   letter-spacing: 0.08em; text-transform: uppercase;
@@ -450,9 +450,9 @@ body {
 }
 .gantt-axis .tick.major { border-left-color: var(--border-strong); color: var(--ink-3); }
 .gantt-row {
-  display: grid; grid-template-columns: 140px 1fr;
+  display: grid; grid-template-columns: var(--label-w, 140px) 1fr;
   align-items: center; border-bottom: 1px dashed var(--border);
-  height: 36px;
+  height: var(--row-h, 36px);
   transition: background 180ms var(--ease);
 }
 .gantt-row:hover { background: var(--surface-2); }
@@ -503,9 +503,13 @@ body {
   border: 1px solid rgba(225,29,46,.3); border-radius: 2px;
 }
 .dep-line {
-  position: absolute; stroke: var(--ink-4); stroke-width: 1; fill: none;
-  stroke-dasharray: 3 3;
+  stroke: var(--ink-4);
+  stroke-width: 1.25;
+  fill: none;
+  stroke-dasharray: 4 3;
+  opacity: .6;
 }
+.dep-line:hover { stroke: var(--blue); opacity: 1; }
 
 /* Tooltip */
 .tooltip {

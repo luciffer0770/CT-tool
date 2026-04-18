@@ -28,6 +28,14 @@ export function exportReportToPDF({ project, schedule, reportId = `R-${Date.now(
   const meta = `${project?.line || "LINE-07"} · ${project?.shift || "Shift B"} · ${new Date().toLocaleString()}`;
   doc.text(meta, 40, 96);
 
+  if (project?.author) {
+    doc.setFontSize(8);
+    doc.setTextColor(120);
+    const author = project.role ? `${project.author}, ${project.role}` : project.author;
+    doc.text(author, 40, 110);
+    if (project.email) doc.text(project.email, 40, 122);
+  }
+
   doc.setFontSize(8);
   doc.setTextColor(120);
   doc.text(`ID ${reportId}   REV v${(project?.versionCount || 14)}`, pageW - 40, 60, { align: "right" });

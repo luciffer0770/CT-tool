@@ -34,11 +34,22 @@ Desktop-only React web application for manufacturing engineers to analyze, optim
 - **N** on the Cycle Builder adds a new step instantly.
 
 ## Stack
-- React 19 + Vite
-- Zustand + localStorage
-- SheetJS (`xlsx`)
-- jsPDF + jspdf-autotable
-- System fonts only — no web-font requests.
+- React 19 + Vite (rolldown)
+- Zustand + localStorage (with quota-error surfacing)
+- SheetJS (`xlsx`) — **lazy-loaded on first use**
+- jsPDF + jspdf-autotable — **lazy-loaded on first use**
+- System fonts only — no external requests on first paint.
+
+## Production essentials
+
+- **Error boundary** wraps the app and every page, with a friendly recovery screen (Continue / Reload / Reset storage) that never trashes data.
+- **Offline detection** banner.
+- **SEO + Open Graph + PWA manifest** + installable icon.
+- **SPA 404.html** emitted by the workflow so deep-links work on Pages.
+- **Code split** — main bundle is 156 kB; Excel and PDF chunks load only when the user exports.
+- **Storage quota warnings** surfaced as toasts if local-storage fills up.
+- **Build metadata** (`__APP_VERSION__`, `__APP_BUILD__`) visible on the Settings → About card.
+- **Profile** (name, initials, role, email, avatar colour) — drives sidebar, activity feed, and PDF report author line.
 
 ## Run locally
 

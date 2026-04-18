@@ -3,8 +3,8 @@ import Icon from "../components/Icon.jsx";
 import Gantt from "../components/Gantt.jsx";
 import { Spark } from "../components/Charts.jsx";
 import { useStore } from "../store/useStore.js";
-import { exportKPIsToPDF } from "../engine/pdf.js";
-import { exportStepsToExcel } from "../engine/excel.js";
+import { exportKPIsToPDF } from "../engine/pdf-lazy.js";
+import { exportStepsToExcel } from "../engine/excel-lazy.js";
 import { calculateOEE } from "../engine/analytics.js";
 
 export default function Dashboard({ schedule }) {
@@ -38,7 +38,7 @@ export default function Dashboard({ schedule }) {
           <div className="page-sub">Real-time overview of cycle time, efficiency and critical path for Line 07.</div>
         </div>
         <div className="toolbar">
-          <button className="btn" onClick={resetToBaseline}><Icon name="reset" size={13}/> Reset</button>
+          <button className="btn" onClick={() => { if (confirm("Reset current steps to the saved baseline?")) resetToBaseline(); }}><Icon name="reset" size={13}/> Reset</button>
           <button className="btn" onClick={() => exportStepsToExcel(steps, schedule)}><Icon name="download" size={13}/> Export .xlsx</button>
           <button className="btn primary" onClick={() => exportKPIsToPDF({ schedule })}><Icon name="download" size={13}/> Export snapshot</button>
         </div>
