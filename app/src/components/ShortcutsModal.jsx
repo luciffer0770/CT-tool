@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useStore } from "../store/useStore.js";
 
 const SHORTCUTS = [
@@ -23,10 +23,16 @@ const SHORTCUTS = [
 export default function ShortcutsModal() {
   const open = useStore(s => s.shortcuts);
   const toggle = useStore(s => s.toggleShortcuts);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") toggle(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, toggle]);
   if (!open) return null;
   return (
     <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) toggle(false); }}>
-      <div className="modal">
+      <div className="modal" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
         <div className="modal-head">
           <h3>Keyboard shortcuts</h3>
           <button className="btn xs" onClick={() => toggle(false)}>Close</button>

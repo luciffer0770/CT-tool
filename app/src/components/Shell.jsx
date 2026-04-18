@@ -5,6 +5,7 @@ import { useStore } from "../store/useStore.js";
 export function Sidebar() {
   const page = useStore(s => s.page);
   const setPage = useStore(s => s.setPage);
+  const settings = useStore(s => s.settings);
   const items = [
     { id: "dashboard", label: "Dashboard",    icon: "dashboard" },
     { id: "builder",   label: "Cycle Builder", icon: "build"    },
@@ -39,11 +40,23 @@ export function Sidebar() {
           </div>
         ))}
 
-        <div className="sidebar-footer">
-          <div className="avatar">MB</div>
+        <div
+          className="sidebar-footer"
+          onClick={() => setPage("settings")}
+          title="Open profile settings"
+          style={{ cursor: "pointer" }}
+        >
+          <div
+            className="avatar"
+            style={{
+              background: `linear-gradient(135deg, ${settings.profileAvatarColor || "#6D28D9"}, ${settings.accent || "#1E40AF"})`,
+            }}
+          >
+            {(settings.profileInitials || "MB").slice(0, 2).toUpperCase()}
+          </div>
           <div>
-            <div className="who">M. Becker</div>
-            <div className="role">Process Engineer · Plant 3</div>
+            <div className="who">{settings.profileName || "M. Becker"}</div>
+            <div className="role">{settings.profileRole || "Process Engineer"}</div>
           </div>
         </div>
       </aside>

@@ -75,7 +75,7 @@ export default function CommandPalette() {
 
   return (
     <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) toggle(false); }}>
-      <div className="modal" onKeyDown={onKey}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label="Command palette" onKeyDown={onKey}>
         <input
           ref={inputRef}
           className="palette-input"

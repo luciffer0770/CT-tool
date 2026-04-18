@@ -3,14 +3,32 @@ const KEY = "cta_project_v1";
 const KEY_VERS = "cta_versions_v1";
 const KEY_SETTINGS = "cta_settings_v1";
 
-export function saveProject(project) {
+const listeners = new Set();
+export function onStorageError(fn) { listeners.add(fn); return () => listeners.delete(fn); }
+function emit(msg, err) { listeners.forEach(l => { try { l(msg, err); } catch {} }); }
+
+function isQuota(e) {
+  if (!e) return false;
+  return e.name === "QuotaExceededError" || /quota|storage/i.test(String(e.message || e));
+}
+
+function safeSet(key, value) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(project));
+    localStorage.setItem(key, value);
     return true;
   } catch (e) {
-    console.warn("[cta] saveProject failed", e);
+    if (isQuota(e)) {
+      emit("Local storage is full. Delete old versions or export your project.", e);
+    } else {
+      emit("Could not save to local storage.", e);
+    }
+    console.warn("[cta] storage.set failed", e);
     return false;
   }
+}
+
+export function saveProject(project) {
+  return safeSet(KEY, JSON.stringify(project));
 }
 
 export function loadProject() {
@@ -32,11 +50,7 @@ export function saveVersion(label, project) {
     project,
   };
   versions.unshift(version);
-  try {
-    localStorage.setItem(KEY_VERS, JSON.stringify(versions.slice(0, 50)));
-  } catch (e) {
-    console.warn("[cta] saveVersion failed", e);
-  }
+  safeSet(KEY_VERS, JSON.stringify(versions.slice(0, 50)));
   return version;
 }
 
@@ -51,16 +65,12 @@ export function loadVersions() {
 
 export function deleteVersion(id) {
   const versions = loadVersions().filter(v => v.id !== id);
-  localStorage.setItem(KEY_VERS, JSON.stringify(versions));
+  safeSet(KEY_VERS, JSON.stringify(versions));
   return versions;
 }
 
 export function saveSettings(s) {
-  try {
-    localStorage.setItem(KEY_SETTINGS, JSON.stringify(s));
-  } catch (e) {
-    console.warn("[cta] saveSettings failed", e);
-  }
+  safeSet(KEY_SETTINGS, JSON.stringify(s));
 }
 
 export function loadSettings() {
@@ -76,4 +86,16 @@ export function clearAll() {
   localStorage.removeItem(KEY);
   localStorage.removeItem(KEY_VERS);
   localStorage.removeItem(KEY_SETTINGS);
+}
+
+export function storageUsage() {
+  let bytes = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      const v = localStorage.getItem(k) || "";
+      bytes += (k.length + v.length) * 2; // utf-16 approximation
+    }
+  } catch {}
+  return bytes;
 }
