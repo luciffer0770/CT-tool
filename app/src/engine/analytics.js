@@ -231,3 +231,71 @@ export function whatIfRemove(steps, takt, stepId) {
     .map(s => ({ ...s, dependencies: (s.dependencies || []).filter(d => d !== stepId) }));
   return computeSchedule(without, takt);
 }
+
+// -------- v2 additions ---------
+
+// Takt time = available production time / customer demand
+export function takt(availableTimeMin, demand) {
+  if (!demand || demand <= 0) return 0;
+  return Math.round((availableTimeMin * 60) / demand); // seconds
+}
+
+// Cost per unit = (labor * sumOperator / 3600) + (machine * sumMachine / 3600) + setup amortised
+export function costPerUnit(steps, { laborRate = 35, machineRate = 80 } = {}) {
+  const sumMachine = steps.reduce((a, s) => a + (Number(s.machineTime) || 0), 0);
+  const sumOp      = steps.reduce((a, s) => a + (Number(s.operatorTime) || 0), 0);
+  const sumSetup   = steps.reduce((a, s) => a + (Number(s.setupTime) || 0), 0);
+  const labor   = (laborRate / 3600) * (sumOp + sumSetup);
+  const machine = (machineRate / 3600) * (sumMachine + sumSetup);
+  return {
+    labor: +labor.toFixed(4),
+    machine: +machine.toFixed(4),
+    total: +(labor + machine).toFixed(4),
+    perHour: {
+      labor: +((laborRate / 3600) * (sumOp + sumSetup) * 3600 / Math.max(1, sumMachine+sumOp+sumSetup)).toFixed(2),
+    },
+  };
+}
+
+// Kanban bin count: demand × lead time × (1 + safety) / container size
+export function kanbanBins({ demandPerMin, leadTimeMin, containerSize = 10, safetyPct = 20 }) {
+  const d = Number(demandPerMin) || 0;
+  const lt = Number(leadTimeMin) || 0;
+  const cs = Math.max(1, Number(containerSize) || 1);
+  const safety = 1 + (Number(safetyPct) || 0) / 100;
+  const bins = Math.ceil((d * lt * safety) / cs);
+  return { bins, demandPerMin: d, leadTimeMin: lt, containerSize: cs, safetyPct };
+}
+
+// Pareto (80/20) of step cycle times
+export function paretoSteps(steps) {
+  const arr = [...steps]
+    .map(s => ({ id: s.id, name: s.name, value: (Number(s.machineTime)||0)+(Number(s.operatorTime)||0)+(Number(s.setupTime)||0) }))
+    .sort((a,b) => b.value - a.value);
+  const total = arr.reduce((a,b) => a + b.value, 0) || 1;
+  let cum = 0;
+  return arr.map(x => { cum += x.value; return { ...x, cumPct: (cum/total)*100 }; });
+}
+
+// Yamazumi stack by station
+export function yamazumiByStation(steps) {
+  const stations = {};
+  steps.forEach(s => {
+    const st = s.stationId || "UNASSIGNED";
+    if (!stations[st]) stations[st] = { id: st, segments: [], total: 0 };
+    const cyc = (Number(s.machineTime)||0)+(Number(s.operatorTime)||0)+(Number(s.setupTime)||0);
+    stations[st].segments.push({ id: s.id, name: s.name, cyc,
+      machine: Number(s.machineTime)||0, operator: Number(s.operatorTime)||0, setup: Number(s.setupTime)||0,
+      isValueAdded: s.isValueAdded !== false,
+    });
+    stations[st].total += cyc;
+  });
+  return Object.values(stations).sort((a,b) => a.id.localeCompare(b.id));
+}
+
+// Spaghetti / 5W+1H waste matrix
+export function wasteTally(steps) {
+  const t = { muda: 0, mura: 0, muri: 0 };
+  steps.forEach(s => { if (s.wasteType && t[s.wasteType] !== undefined) t[s.wasteType]++; });
+  return t;
+}

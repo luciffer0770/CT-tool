@@ -2,6 +2,9 @@ import React, { useMemo } from "react";
 import { useStore } from "./store/useStore.js";
 import { computeSchedule } from "./engine/calc.js";
 import { Sidebar, TopBar, StatusBar, Toasts } from "./components/Shell.jsx";
+import CommandPalette from "./components/CommandPalette.jsx";
+import ShortcutsModal from "./components/ShortcutsModal.jsx";
+import KeyboardShortcuts from "./components/KeyboardShortcuts.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Builder from "./pages/Builder.jsx";
 import GanttView from "./pages/GanttView.jsx";
@@ -9,6 +12,7 @@ import Analytics from "./pages/Analytics.jsx";
 import Simulation from "./pages/Simulation.jsx";
 import Reports from "./pages/Reports.jsx";
 import Settings from "./pages/Settings.jsx";
+import Tools from "./pages/Tools.jsx";
 
 export default function App() {
   const page = useStore(s => s.page);
@@ -27,6 +31,7 @@ export default function App() {
         {page === "gantt" && <GanttView schedule={schedule}/>}
         {page === "analytics" && <Analytics schedule={schedule}/>}
         {page === "sim" && <Simulation schedule={schedule}/>}
+        {page === "tools" && <Tools schedule={schedule}/>}
         {page === "reports" && <Reports schedule={schedule}/>}
         {page === "settings" && <Settings/>}
         <div style={{ height: 40 }}/>
@@ -35,6 +40,9 @@ export default function App() {
         <StatusBar schedule={schedule}/>
       </div>
       <Toasts/>
+      <CommandPalette/>
+      <ShortcutsModal/>
+      <KeyboardShortcuts/>
     </div>
   );
 }

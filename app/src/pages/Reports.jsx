@@ -44,6 +44,7 @@ export default function Reports({ schedule }) {
           <div className="page-sub">Generate shift reports and export to PDF/Excel for quality &amp; engineering reviews.</div>
         </div>
         <div className="toolbar">
+          <button className="btn" onClick={() => window.print()}><Icon name="report" size={13}/> Print</button>
           <button className="btn" onClick={() => exportStepsToExcel(steps, schedule)}><Icon name="download" size={13}/> Export Excel</button>
           <button className="btn primary" onClick={onExportPDF}><Icon name="download" size={13}/> Export PDF</button>
         </div>
@@ -82,9 +83,8 @@ export default function Reports({ schedule }) {
             </div>
           </div>
           <div className="card-body" style={{ background: "var(--bg-2)", padding: 16 }}>
-            <div style={{ background: "white", padding: 28, boxShadow: "var(--shadow-md)", border: "1px solid var(--border)" }}>
-              <div className="prism"/>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginTop: 14 }}>
+            <div className="report-paper" style={{ background: "white", padding: 28, boxShadow: "var(--shadow-md)", border: "1px solid var(--border)", borderTop: "3px solid var(--blue)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div>
                   <div className="mono muted" style={{ fontSize: 10, letterSpacing: ".14em" }}>CYCLE TIME REPORT</div>
                   <h2 style={{ fontFamily: "var(--font-head)", fontSize: 22, margin: "4px 0 0", fontWeight: 600, color: "#0B1020" }}>{settings.line} · {settings.shift}</h2>

@@ -8,6 +8,8 @@
 //  - bottleneck detection
 
 export function cycleTimeOf(step) {
+  // External setup is performed during the previous step's cycle (SMED),
+  // so it does NOT contribute to the in-line cycle time.
   return (Number(step.machineTime) || 0) + (Number(step.operatorTime) || 0) + (Number(step.setupTime) || 0);
 }
 

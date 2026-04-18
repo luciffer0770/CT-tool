@@ -3,7 +3,7 @@ import { computeSchedule, detectCycles } from "../src/engine/calc.js";
 import {
   bottleneckContribution, vaNvaRatio, taktGap, stepImpact,
   lineBalance, cycleStats, calculateOEE, suggestOptimization, autoLineBalance,
-  whatIfRemove, validateSteps,
+  whatIfRemove, validateSteps, takt, costPerUnit, kanbanBins, paretoSteps, yamazumiByStation,
 } from "../src/engine/analytics.js";
 import { DEFAULT_STEPS } from "../src/data/templates.js";
 
@@ -58,6 +58,17 @@ const removeSim = whatIfRemove(DEFAULT_STEPS, 240, "s10");
 assert(removeSim.steps.length === DEFAULT_STEPS.length - 1, "what-if remove shortens list");
 const warnings = validateSteps(DEFAULT_STEPS);
 assert(Array.isArray(warnings), "validateSteps returns array");
+
+// v2 additions
+assert(takt(420, 100) === 252, "takt(420min, 100u) = 252s");
+const c = costPerUnit(DEFAULT_STEPS, { laborRate: 40, machineRate: 80 });
+assert(c.total > 0, "costPerUnit produces positive total");
+const kb = kanbanBins({ demandPerMin: 2, leadTimeMin: 30, containerSize: 10, safetyPct: 20 });
+assert(kb.bins === 8, `kanban bins: expected 8, got ${kb.bins}`);
+const paretoRes = paretoSteps(DEFAULT_STEPS);
+assert(paretoRes.length === DEFAULT_STEPS.length && paretoRes[0].cumPct <= 100, "pareto valid");
+const yama = yamazumiByStation(DEFAULT_STEPS);
+assert(Array.isArray(yama) && yama.length > 0, "yamazumi groups by station");
 
 console.log("\nFailures:", failures);
 process.exit(failures > 0 ? 1 : 0);

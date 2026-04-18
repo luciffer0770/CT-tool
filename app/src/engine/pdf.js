@@ -5,15 +5,12 @@ export function exportReportToPDF({ project, schedule, reportId = `R-${Date.now(
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
 
-  // Colored prism bar on top
-  const bar = [["#E11D2E", 0.2], ["#6D28D9", 0.2], ["#1E40AF", 0.2], ["#06B6D4", 0.2], ["#22C55E", 0.2]];
-  let x = 40;
-  const w = (pageW - 80) / 5;
-  bar.forEach(([c]) => {
-    doc.setFillColor(c);
-    doc.rect(x, 36, w, 5, "F");
-    x += w;
-  });
+  // Header (no prism bar, clean top rule)
+  doc.setDrawColor(30, 64, 175);
+  doc.setLineWidth(2);
+  doc.line(40, 40, pageW - 40, 40);
+  doc.setLineWidth(1);
+  doc.setDrawColor(0);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
@@ -60,10 +57,11 @@ export function exportReportToPDF({ project, schedule, reportId = `R-${Date.now(
   // Steps table
   autoTable(doc, {
     startY: 190,
-    head: [["#", "Step", "Machine", "Operator", "Setup", "Cycle", "Start", "End", "Wait", "Status"]],
+    head: [["#", "Step", "Station", "Machine", "Operator", "Setup", "Cycle", "Start", "End", "Wait", "Status"]],
     body: schedule.steps.map((s, i) => [
       i + 1,
       s.name,
+      s.stationId || "—",
       `${s.machineTime}s`,
       `${s.operatorTime}s`,
       `${s.setupTime}s`,
@@ -77,7 +75,7 @@ export function exportReportToPDF({ project, schedule, reportId = `R-${Date.now(
     headStyles: { fillColor: [30, 64, 175], textColor: 255 },
     alternateRowStyles: { fillColor: [245, 247, 250] },
     didDrawCell: (data) => {
-      if (data.section === "body" && data.column.index === 9) {
+      if (data.section === "body" && data.column.index === 10) {
         const v = data.cell.raw;
         if (v === "BOTTLENECK") {
           doc.setFillColor(253, 236, 238);
@@ -117,7 +115,6 @@ function drawGantt(doc, schedule, x, y, w, h) {
   const labelW = 120;
   const trackW = w - labelW;
   const rowH = Math.max(14, Math.min(26, (h - 30) / steps.length));
-  // axis ticks
   doc.setDrawColor(220);
   const tickEvery = 20;
   for (let t = 0; t <= total; t += tickEvery) {
@@ -129,7 +126,6 @@ function drawGantt(doc, schedule, x, y, w, h) {
     const tx = x + labelW + (t / total) * trackW;
     doc.text(`${t}s`, tx, y - 2);
   }
-  // takt line
   const tktx = x + labelW + (schedule.takt / total) * trackW;
   doc.setDrawColor(225, 29, 46);
   doc.setLineDashPattern([3, 3], 0);
@@ -142,7 +138,6 @@ function drawGantt(doc, schedule, x, y, w, h) {
     const ry = y + i * rowH + 2;
     doc.setTextColor(40); doc.setFontSize(8);
     doc.text(s.name.slice(0, 20), x, ry + rowH / 2 + 2);
-    // setup
     const setupX = x + labelW + (s.startTime / total) * trackW;
     const setupW = (s.setupTime / total) * trackW;
     const machX = setupX + setupW;
@@ -174,3 +169,121 @@ export function exportKPIsToPDF({ schedule, title = "KPI Snapshot" }) {
   });
   doc.save(`kpi-${Date.now()}.pdf`);
 }
+
+// Export Gantt as SVG file
+export function exportGanttSVG(schedule, filename = "gantt.svg") {
+  const steps = schedule.steps;
+  if (!steps.length) return;
+  const rowH = 28;
+  const labelW = 160;
+  const chartW = 1100;
+  const totalW = labelW + chartW + 20;
+  const maxX = Math.max(schedule.totalCycleTime, schedule.takt) * 1.05 || 1;
+  const scale = chartW / maxX;
+  const tickEvery = 20;
+
+  let body = "";
+  // axis
+  for (let t = 0; t <= maxX; t += tickEvery) {
+    const tx = labelW + t * scale;
+    const isMajor = t % (tickEvery * 2) === 0;
+    body += `<line x1="${tx}" y1="26" x2="${tx}" y2="${26 + steps.length * rowH}" stroke="${isMajor ? '#CFD5E2' : '#E2E6EF'}" stroke-width="1"/>`;
+    if (isMajor) body += `<text x="${tx + 3}" y="18" font-size="10" fill="#5B6274" font-family="system-ui">${t}s</text>`;
+  }
+  // takt line
+  const ttx = labelW + schedule.takt * scale;
+  body += `<line x1="${ttx}" y1="0" x2="${ttx}" y2="${26 + steps.length * rowH}" stroke="#E11D2E" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+  body += `<text x="${ttx + 3}" y="12" font-size="10" fill="#E11D2E" font-family="system-ui" font-weight="600">TAKT ${schedule.takt}s</text>`;
+
+  steps.forEach((s, i) => {
+    const ry = 26 + i * rowH;
+    body += `<text x="6" y="${ry + rowH / 2 + 4}" font-size="11" fill="#0B1020" font-family="system-ui">${escapeXml(`${String(i+1).padStart(2,"0")} ${s.name}`)}</text>`;
+    // setup
+    if (s.setupTime > 0)
+      body += `<rect x="${labelW + s.startTime * scale}" y="${ry + 5}" width="${s.setupTime * scale}" height="${rowH - 10}" fill="#6D28D9" rx="2"/>`;
+    // machine
+    if (s.machineTime > 0)
+      body += `<rect x="${labelW + (s.startTime + s.setupTime) * scale}" y="${ry + 5}" width="${s.machineTime * scale}" height="${rowH - 10}" fill="${s.bottleneck ? '#E11D2E' : '#1E40AF'}" rx="2"/>`;
+    // operator
+    if (s.operatorTime > 0)
+      body += `<rect x="${labelW + (s.startTime + s.setupTime + s.machineTime) * scale}" y="${ry + 5}" width="${s.operatorTime * scale}" height="${rowH - 10}" fill="#06B6D4" rx="2"/>`;
+  });
+
+  const totalH = 26 + steps.length * rowH + 10;
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}">
+  <rect width="100%" height="100%" fill="white"/>
+  ${body}
+</svg>`;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// Export Gantt as PNG via canvas rasterisation of the SVG
+export function exportGanttPNG(schedule, filename = "gantt.png") {
+  const steps = schedule.steps;
+  if (!steps.length) return;
+  const rowH = 28;
+  const labelW = 160;
+  const chartW = 1100;
+  const totalW = labelW + chartW + 20;
+  const maxX = Math.max(schedule.totalCycleTime, schedule.takt) * 1.05 || 1;
+  const scale = chartW / maxX;
+  const tickEvery = 20;
+  const totalH = 26 + steps.length * rowH + 10;
+
+  const c = document.createElement("canvas");
+  c.width = totalW * 2; c.height = totalH * 2;
+  const ctx = c.getContext("2d");
+  ctx.scale(2, 2);
+  ctx.fillStyle = "white"; ctx.fillRect(0, 0, totalW, totalH);
+  ctx.font = "11px system-ui";
+
+  // axis
+  for (let t = 0; t <= maxX; t += tickEvery) {
+    const tx = labelW + t * scale;
+    const isMajor = t % (tickEvery * 2) === 0;
+    ctx.strokeStyle = isMajor ? "#CFD5E2" : "#E2E6EF"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(tx, 26); ctx.lineTo(tx, 26 + steps.length * rowH); ctx.stroke();
+    if (isMajor) { ctx.fillStyle = "#5B6274"; ctx.fillText(`${t}s`, tx + 3, 18); }
+  }
+
+  // takt
+  const ttx = labelW + schedule.takt * scale;
+  ctx.strokeStyle = "#E11D2E"; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(ttx, 0); ctx.lineTo(ttx, 26 + steps.length * rowH); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = "#E11D2E"; ctx.font = "bold 10px system-ui"; ctx.fillText(`TAKT ${schedule.takt}s`, ttx + 3, 12);
+  ctx.font = "11px system-ui";
+
+  steps.forEach((s, i) => {
+    const ry = 26 + i * rowH;
+    ctx.fillStyle = "#0B1020";
+    ctx.fillText(`${String(i+1).padStart(2,"0")} ${s.name}`, 6, ry + rowH / 2 + 4);
+    if (s.setupTime > 0) {
+      ctx.fillStyle = "#6D28D9";
+      ctx.fillRect(labelW + s.startTime * scale, ry + 5, s.setupTime * scale, rowH - 10);
+    }
+    if (s.machineTime > 0) {
+      ctx.fillStyle = s.bottleneck ? "#E11D2E" : "#1E40AF";
+      ctx.fillRect(labelW + (s.startTime + s.setupTime) * scale, ry + 5, s.machineTime * scale, rowH - 10);
+    }
+    if (s.operatorTime > 0) {
+      ctx.fillStyle = "#06B6D4";
+      ctx.fillRect(labelW + (s.startTime + s.setupTime + s.machineTime) * scale, ry + 5, s.operatorTime * scale, rowH - 10);
+    }
+  });
+
+  c.toBlob((blob) => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }, "image/png");
+}
+
+function escapeXml(s) { return String(s).replace(/[<>&"]/g, c => ({ "<":"&lt;",">":"&gt;","&":"&amp;","\"":"&quot;"}[c])); }
