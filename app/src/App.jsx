@@ -1,0 +1,40 @@
+import React, { useMemo } from "react";
+import { useStore } from "./store/useStore.js";
+import { computeSchedule } from "./engine/calc.js";
+import { Sidebar, TopBar, StatusBar, Toasts } from "./components/Shell.jsx";
+import Dashboard from "./pages/Dashboard.jsx";
+import Builder from "./pages/Builder.jsx";
+import GanttView from "./pages/GanttView.jsx";
+import Analytics from "./pages/Analytics.jsx";
+import Simulation from "./pages/Simulation.jsx";
+import Reports from "./pages/Reports.jsx";
+import Settings from "./pages/Settings.jsx";
+
+export default function App() {
+  const page = useStore(s => s.page);
+  const steps = useStore(s => s.steps);
+  const taktTime = useStore(s => s.taktTime);
+
+  const schedule = useMemo(() => computeSchedule(steps, taktTime), [steps, taktTime]);
+
+  return (
+    <div className="app" data-screen-label={page}>
+      <Sidebar/>
+      <TopBar schedule={schedule}/>
+      <main className="main">
+        {page === "dashboard" && <Dashboard schedule={schedule}/>}
+        {page === "builder" && <Builder schedule={schedule}/>}
+        {page === "gantt" && <GanttView schedule={schedule}/>}
+        {page === "analytics" && <Analytics schedule={schedule}/>}
+        {page === "sim" && <Simulation schedule={schedule}/>}
+        {page === "reports" && <Reports schedule={schedule}/>}
+        {page === "settings" && <Settings/>}
+        <div style={{ height: 40 }}/>
+      </main>
+      <div style={{ gridColumn: "1 / -1" }}>
+        <StatusBar schedule={schedule}/>
+      </div>
+      <Toasts/>
+    </div>
+  );
+}
